@@ -12,6 +12,12 @@ import {
 import { Google as GoogleIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../firebase';
+import { 
+  signInWithEmailAndPassword, 
+  GoogleAuthProvider, 
+  signInWithPopup 
+} from 'firebase/auth';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -23,92 +29,153 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+
     try {
-      setError('');
-      setLoading(true);
+      // Primero verificamos si es el admin
+      if (email === 'admin@aseguradora.com') {
+        await login(email, password);
+        console.log('Login de administrador detectado');
+        navigate('/admin');
+        return;
+      }
+
+      // Para usuarios normales
       await login(email, password);
       navigate('/dashboard');
     } catch (error) {
-      setError('Error al iniciar sesión: ' + error.message);
+      console.error('Error al iniciar sesión:', error);
+      let errorMessage = 'Error al iniciar sesión: ';
+      
+      if (error.code === 'auth/invalid-credential') {
+        errorMessage = 'Email o contraseña incorrectos';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Demasiados intentos fallidos. Por favor, intenta más tarde';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+
     try {
-      setError('');
-      setLoading(true);
       await loginWithGoogle();
+      // Los usuarios de Google siempre van al dashboard normal
       navigate('/dashboard');
     } catch (error) {
-      setError('Error al iniciar sesión con Google: ' + error.message);
+      console.error('Error al iniciar sesión con Google:', error);
+      let errorMessage = 'Error al iniciar sesión con Google: ';
+      
+      if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'Por favor, permite las ventanas emergentes para iniciar sesión con Google';
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'Inicio de sesión cancelado';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h4" component="h1" align="center" gutterBottom>
+    <Container component="main" maxWidth="sm">
+      <Box
+        sx={{
+          mt: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}
+      >
+        <Paper 
+          elevation={3}
+          sx={{
+            p: 4,
+            width: '100%',
+            borderRadius: 2
+          }}
+        >
+          <Typography component="h1" variant="h5" gutterBottom align="center">
             Iniciar Sesión
           </Typography>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-          <form onSubmit={handleSubmit}>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            startIcon={<GoogleIcon />}
+            sx={{ 
+              mb: 2,
+              py: 1.5,
+              textTransform: 'none',
+              fontSize: '1rem'
+            }}
+          >
+            Continuar con Google
+          </Button>
+
+          <Divider sx={{ my: 2 }}>o</Divider>
+
+          <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
-              label="Email"
-              type="email"
-              fullWidth
               margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Correo Electrónico"
+              name="email"
+              autoComplete="email"
+              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              disabled={loading}
             />
             <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
               label="Contraseña"
               type="password"
-              fullWidth
-              margin="normal"
+              id="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              disabled={loading}
             />
             <Button
               type="submit"
-              variant="contained"
               fullWidth
-              sx={{ mt: 3 }}
+              variant="contained"
               disabled={loading}
+              sx={{ 
+                mt: 3,
+                mb: 2,
+                py: 1.5,
+                textTransform: 'none',
+                fontSize: '1rem'
+              }}
             >
               Iniciar Sesión
             </Button>
-          </form>
-
-          <Divider sx={{ my: 3 }}>o</Divider>
-
-          <Button
-            variant="outlined"
-            fullWidth
-            startIcon={<GoogleIcon />}
-            onClick={handleGoogleLogin}
-            disabled={loading}
-          >
-            Iniciar Sesión con Google
-          </Button>
-
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="body2">
-              ¿No tienes una cuenta?{' '}
-              <Button
-                color="primary"
-                onClick={() => navigate('/register')}
-                sx={{ textTransform: 'none' }}
-              >
-                Regístrate aquí
-              </Button>
-            </Typography>
           </Box>
         </Paper>
       </Box>

@@ -1,11 +1,12 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import NewIncident from './pages/NewIncident';
 import IncidentList from './pages/IncidentList';
 import { AuthProvider } from './context/AuthContext';
@@ -33,6 +34,14 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute adminOnly={true}>
+                    <AdminDashboard />
+                  </PrivateRoute>
+                }
+              />
               <Route
                 path="/dashboard"
                 element={

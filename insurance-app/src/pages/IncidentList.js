@@ -55,22 +55,120 @@ function IncidentList() {
 
   const fetchIncidents = async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/incidents/${currentUser.uid}`);
-      setIncidents(response.data);
+      console.log('Iniciando carga de incidencias...');
+      
+      if (!currentUser) {
+        console.error('No hay usuario autenticado');
+        setError('Debe iniciar sesión para ver las incidencias');
+        setLoading(false);
+        return;
+      }
+
+      const token = await currentUser.getIdToken();
+      console.log('Token obtenido, realizando petición para:', currentUser.uid);
+
+      const response = await axios.get(
+        `http://localhost:8000/api/incidents/${currentUser.uid}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Incidencias recibidas:', response.data.length);
+      
+      // Procesar las incidencias para asegurar que las fotos sean arrays
+      const processedIncidents = response.data.map(incident => ({
+        ...incident,
+        photos: Array.isArray(incident.photos) ? incident.photos : []
+      }));
+
+      setIncidents(processedIncidents);
       setLoading(false);
+      setError('');
     } catch (error) {
-      setError('Error al cargar las incidencias: ' + error.message);
+      console.error('Error al cargar las incidencias:', error);
+      let errorMessage = 'Error al cargar las incidencias: ';
+      
+      if (error.response?.data?.message) {
+        errorMessage += error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage += error.response.data.error;
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Error desconocido';
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };
 
   const handleViewDetails = async (incidentId) => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/incidents/detail/${incidentId}`);
-      setSelectedIncident(response.data);
+      console.log('Solicitando detalles de incidencia:', incidentId);
+      
+      const token = await currentUser.getIdToken();
+      const response = await axios.get(
+        `http://localhost:8000/api/incidents/detail/${incidentId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Detalles recibidos:', response.data);
+      
+      // Procesar las fotos
+      let photos = [];
+      if (response.data.photos) {
+        if (typeof response.data.photos === 'string') {
+          try {
+            photos = JSON.parse(response.data.photos);
+          } catch (e) {
+            console.error('Error al parsear fotos:', e);
+            photos = [];
+          }
+        } else if (Array.isArray(response.data.photos)) {
+          photos = response.data.photos;
+        }
+      }
+      
+      // Asegurar que photos sea un array y filtrar fotos inválidas
+      photos = Array.isArray(photos) ? photos : [];
+      photos = photos.filter(photo => photo && typeof photo === 'string' && photo.trim() !== '');
+      
+      console.log('Fotos procesadas:', photos.length);
+      
+      const updatedIncident = {
+        ...response.data,
+        photos: photos,
+        created_at: new Date(response.data.created_at).toLocaleString(),
+        updated_at: response.data.updated_at ? new Date(response.data.updated_at).toLocaleString() : null
+      };
+      
+      setSelectedIncident(updatedIncident);
       setOpenDialog(true);
     } catch (error) {
-      setError('Error al cargar los detalles de la incidencia: ' + error.message);
+      console.error('Error al cargar los detalles:', error);
+      let errorMessage = 'Error al cargar los detalles: ';
+      
+      if (error.response?.data?.message) {
+        errorMessage += error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage += error.response.data.error;
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Error desconocido';
+      }
+      
+      setError(errorMessage);
     }
   };
 
@@ -87,11 +185,25 @@ function IncidentList() {
   };
 
   const parsePhotos = (photos) => {
-    if (!photos) return [];
+    console.log('Parseando fotos:', photos);
+    console.log('Tipo de fotos a parsear:', typeof photos);
+    
+    if (!photos) {
+      console.log('No hay fotos para parsear');
+      return [];
+    }
+    
+    if (Array.isArray(photos)) {
+      console.log('Las fotos ya son un array:', photos);
+      return photos;
+    }
+    
     try {
-      return typeof photos === 'string' ? JSON.parse(photos) : photos;
+      const parsed = JSON.parse(photos);
+      console.log('Fotos parseadas exitosamente:', parsed);
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      console.error('Error al parsear fotos:', e);
+      console.error('Error al parsear fotos en parsePhotos:', e);
       return [];
     }
   };
@@ -177,11 +289,14 @@ function IncidentList() {
 
         <Dialog 
           open={openDialog} 
-          onClose={handleCloseDialog} 
-          maxWidth="md" 
+          onClose={handleCloseDialog}
+          maxWidth="md"
           fullWidth
           PaperProps={{
-            sx: { maxHeight: '90vh' }
+            sx: { 
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }
           }}
         >
           {selectedIncident && (
@@ -207,69 +322,74 @@ function IncidentList() {
                     size="small"
                   />
                 </Typography>
+                <Typography gutterBottom>
+                  <strong>Fecha de creación:</strong> {selectedIncident.created_at}
+                </Typography>
+                {selectedIncident.updated_at && (
+                  <Typography gutterBottom>
+                    <strong>Última actualización:</strong> {selectedIncident.updated_at}
+                  </Typography>
+                )}
                 {selectedIncident.feedback && (
                   <Typography gutterBottom>
                     <strong>Feedback:</strong> {selectedIncident.feedback}
                   </Typography>
                 )}
-                {selectedIncident.photos && (
-                  <Box sx={{ mt: 2 }}>
+                
+                {/* Sección de fotos */}
+                {selectedIncident.photos && selectedIncident.photos.length > 0 ? (
+                  <Box sx={{ mt: 3 }}>
                     <Typography gutterBottom>
-                      <strong>Fotos:</strong>
+                      <strong>Fotos ({selectedIncident.photos.length}):</strong>
                     </Typography>
-                    <Grid container spacing={2}>
-                      {parsePhotos(selectedIncident.photos).map((photo, index) => (
+                    <Grid container spacing={1}>
+                      {selectedIncident.photos.map((photo, index) => (
                         <Grid item xs={12} sm={6} md={4} key={index}>
-                          {!imageLoadError[index] ? (
-                            <Box
-                              sx={{
-                                position: 'relative',
-                                width: '100%',
-                                paddingTop: '75%', // Aspecto 4:3
-                                backgroundColor: '#f5f5f5',
-                                borderRadius: '8px',
-                                overflow: 'hidden'
+                          <Paper
+                            elevation={3}
+                            sx={{
+                              position: 'relative',
+                              height: 200,
+                              width: '100%',
+                              overflow: 'hidden',
+                              borderRadius: 1,
+                              backgroundColor: '#f5f5f5',
+                              '&:hover': {
+                                transform: 'scale(1.02)',
+                                transition: 'transform 0.2s'
+                              }
+                            }}
+                          >
+                            <img
+                              src={photo}
+                              alt={`Foto ${index + 1}`}
+                              onError={(e) => {
+                                console.error('Error al cargar la imagen:', photo);
+                                e.target.src = 'https://via.placeholder.com/400x300?text=Error+al+cargar+imagen';
                               }}
-                            >
-                              <img
-                                src={photo}
-                                alt={`Foto ${index + 1}`}
-                                onError={() => handleImageError(index)}
-                                style={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover'
-                                }}
-                              />
-                            </Box>
-                          ) : (
-                            <Box
-                              sx={{
+                              style={{
                                 width: '100%',
-                                height: '200px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: '#f5f5f5',
-                                borderRadius: '8px'
+                                height: '100%',
+                                objectFit: 'cover'
                               }}
-                            >
-                              <Typography color="text.secondary">
-                                Error al cargar la imagen
-                              </Typography>
-                            </Box>
-                          )}
+                            />
+                          </Paper>
                         </Grid>
                       ))}
                     </Grid>
                   </Box>
+                ) : (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography color="text.secondary">
+                      No hay fotos disponibles para esta incidencia
+                    </Typography>
+                  </Box>
                 )}
               </DialogContent>
               <DialogActions>
-                <Button onClick={handleCloseDialog}>Cerrar</Button>
+                <Button onClick={handleCloseDialog}>
+                  Cerrar
+                </Button>
               </DialogActions>
             </>
           )}

@@ -250,10 +250,16 @@ function IncidentList() {
             </Button>
           </Paper>
         ) : (
-          <Grid container spacing={3}>
+          <Grid container spacing={1} sx={{ display: 'flex', justifyContent: 'flex-start' }}>
             {incidents.map((incident) => (
-              <Grid item xs={12} md={6} key={incident.id}>
-                <Card>
+              <Grid item key={incident.id} sx={{ width: '175px', m: 1 }}>
+                <Card sx={{ 
+                  height: 220, 
+                  width: '100%',
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  justifyContent: 'space-between'
+                }}>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
                       {incident.appliance_type}
@@ -261,7 +267,14 @@ function IncidentList() {
                     <Typography color="textSecondary" gutterBottom>
                       Tipo: {incident.type}
                     </Typography>
-                    <Typography variant="body2" noWrap>
+                    <Typography variant="body2" sx={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      height: '40px'
+                    }}>
                       {incident.description}
                     </Typography>
                     <Box sx={{ mt: 2 }}>

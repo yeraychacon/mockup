@@ -7,7 +7,8 @@ import {
   Typography,
   Box,
   Divider,
-  Alert
+  Alert,
+  useTheme
 } from '@mui/material';
 import { Google as GoogleIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +27,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login, loginWithGoogle } = useAuth();
+  const theme = useTheme();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,14 +37,21 @@ function Login() {
     try {
       // Primero verificamos si es el admin
       if (email === 'admin@aseguradora.com') {
-        await login(email, password);
+        const result = await login(email, password);
         console.log('Login de administrador detectado');
+        console.log('==============================');
+        console.log('Bienvenido, Administrador!');
+        console.log('==============================');
         navigate('/admin');
         return;
       }
 
       // Para usuarios normales
-      await login(email, password);
+      const result = await login(email, password);
+      console.log('==============================');
+      console.log(`Bienvenido, ${result.user.email}!`);
+      console.log('Redirigiendo al dashboard...');
+      console.log('==============================');
       navigate('/dashboard');
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
@@ -67,8 +76,12 @@ function Login() {
     setLoading(true);
 
     try {
-      await loginWithGoogle();
+      const result = await loginWithGoogle();
       // Los usuarios de Google siempre van al dashboard normal
+      console.log('==============================');
+      console.log(`Bienvenido, ${result.user.displayName || result.user.email}!`);
+      console.log('Redirigiendo al dashboard...');
+      console.log('==============================');
       navigate('/dashboard');
     } catch (error) {
       console.error('Error al iniciar sesión con Google:', error);
@@ -99,83 +112,162 @@ function Login() {
         }}
       >
         <Paper 
-          elevation={3}
+          elevation={5}
           sx={{
-            p: 4,
             width: '100%',
-            borderRadius: 2
+            borderRadius: 2,
+            overflow: 'hidden',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
           }}
         >
-          <Typography component="h1" variant="h5" gutterBottom align="center">
-            Iniciar Sesión
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            startIcon={<GoogleIcon />}
+          {/* Cabecera con fondo negro */}
+          <Box 
             sx={{ 
-              mb: 2,
-              py: 1.5,
-              textTransform: 'none',
-              fontSize: '1rem'
+              bgcolor: theme.palette.primary.main, 
+              p: 3, 
+              color: 'white',
+              textAlign: 'center'
             }}
           >
-            Continuar con Google
-          </Button>
+            <Typography component="h1" variant="h4" gutterBottom>
+              Iniciar Sesión
+            </Typography>
+            <Typography variant="body2">
+              Accede a tu cuenta para gestionar tus electrodomésticos
+            </Typography>
+          </Box>
 
-          <Divider sx={{ my: 2 }}>o</Divider>
+          {/* Contenido con fondo blanco y bordes morados */}
+          <Box 
+            sx={{ 
+              p: 4, 
+              borderTop: `4px solid ${theme.palette.secondary.main}`,
+              bgcolor: 'white'
+            }}
+          >
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
 
-          <Box component="form" onSubmit={handleSubmit} noValidate>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Correo Electrónico"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Contraseña"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
             <Button
-              type="submit"
               fullWidth
-              variant="contained"
+              variant="outlined"
+              onClick={handleGoogleLogin}
               disabled={loading}
+              startIcon={<GoogleIcon />}
               sx={{ 
-                mt: 3,
                 mb: 2,
                 py: 1.5,
                 textTransform: 'none',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                borderColor: theme.palette.secondary.main,
+                color: theme.palette.secondary.main,
+                '&:hover': {
+                  borderColor: theme.palette.secondary.dark,
+                  backgroundColor: 'rgba(106, 27, 154, 0.05)',
+                }
               }}
             >
-              Iniciar Sesión
+              Continuar con Google
             </Button>
+
+            <Divider sx={{ my: 2 }}>o</Divider>
+
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label="Correo Electrónico"
+                name="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                sx={{
+                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.secondary.main,
+                  },
+                  '& .MuiInputLabel-root.Mui-focused': {
+                    color: theme.palette.secondary.main,
+                  }
+                }}
+              />
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                name="password"
+                label="Contraseña"
+                type="password"
+                id="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                sx={{
+                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.secondary.main,
+                  },
+                  '& .MuiInputLabel-root.Mui-focused': {
+                    color: theme.palette.secondary.main,
+                  }
+                }}
+              />
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading}
+                sx={{ 
+                  mt: 3,
+                  mb: 2,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  bgcolor: theme.palette.primary.main,
+                  '&:hover': {
+                    bgcolor: '#333333',
+                  }
+                }}
+              >
+                Iniciar Sesión
+              </Button>
+            </Box>
+
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Typography variant="body2">
+                ¿No tienes una cuenta?{' '}
+                <Button
+                  onClick={() => navigate('/register')}
+                  sx={{ 
+                    textTransform: 'none',
+                    color: theme.palette.secondary.main,
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Regístrate aquí
+                </Button>
+              </Typography>
+            </Box>
+          </Box>
+          
+          {/* Pie con fondo morado */}
+          <Box 
+            sx={{ 
+              bgcolor: theme.palette.secondary.main, 
+              p: 2, 
+              color: 'white',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2">
+              Seguro de Electrodomésticos - Tu mejor opción
+            </Typography>
           </Box>
         </Paper>
       </Box>

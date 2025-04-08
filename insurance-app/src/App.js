@@ -9,16 +9,46 @@ import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import NewIncident from './pages/NewIncident';
 import IncidentList from './pages/IncidentList';
+import IncidentDetail from './pages/IncidentDetail';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
+      main: '#000000',
+      light: '#2c2c2c',
+      dark: '#000000',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#6A1B9A',
+      light: '#9C27B0',
+      dark: '#4A148C',
+      contrastText: '#ffffff',
+    },
+    background: {
+      default: '#f5f5f5',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#121212',
+      secondary: '#333333',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontWeight: 700,
+    },
+    h2: {
+      fontWeight: 700,
+    },
+    h3: {
+      fontWeight: 600,
+    },
+    button: {
+      textTransform: 'none',
     },
   },
 });
@@ -31,9 +61,12 @@ function App() {
           <div className="App">
             <Header />
             <Routes>
+              {/* Rutas públicas - siempre accesibles */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              
+              {/* Rutas protegidas - requieren autenticación */}
               <Route
                 path="/admin"
                 element={
@@ -63,6 +96,14 @@ function App() {
                 element={
                   <PrivateRoute>
                     <IncidentList />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/incidents/detail/:id"
+                element={
+                  <PrivateRoute>
+                    <IncidentDetail />
                   </PrivateRoute>
                 }
               />

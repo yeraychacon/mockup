@@ -242,16 +242,16 @@ function AdminDashboard() {
                       onChange={(e) => handleStatusChange(incident.id, e.target.value)}
                       sx={{
                         '& .MuiSelect-select': {
-                          color: incident.status === 'resuelto' ? 'success.main' :
-                                incident.status === 'rechazado' ? 'error.main' :
-                                incident.status === 'en_proceso' ? 'info.main' : 'warning.main'
+                          color: incident.status === 'resolved' ? 'success.main' :
+                                incident.status === 'rejected' ? 'error.main' :
+                                incident.status === 'in_progress' ? 'info.main' : 'warning.main'
                         }
                       }}
                     >
-                      <MenuItem value="pendiente">Pendiente</MenuItem>
-                      <MenuItem value="en_proceso">En Proceso</MenuItem>
-                      <MenuItem value="resuelto">Resuelto</MenuItem>
-                      <MenuItem value="rechazado">Rechazado</MenuItem>
+                      <MenuItem value="pending">Pendiente</MenuItem>
+                      <MenuItem value="in_progress">En Proceso</MenuItem>
+                      <MenuItem value="resolved">Resuelto</MenuItem>
+                      <MenuItem value="rejected">Rechazado</MenuItem>
                     </Select>
                   </FormControl>
                 </TableCell>

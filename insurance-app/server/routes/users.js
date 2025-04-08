@@ -6,13 +6,19 @@ const { verifyToken } = require('../middleware/auth');
 // Crear o actualizar usuario
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { id, email, provider, name, photo_url, created_at } = req.body;
+    const { id, email, provider, name, photo_url } = req.body;
 
     // Verificar que el token coincide con el usuario
     if (req.user.uid !== id) {
       return res.status(403).json({
         message: 'No autorizado para crear/actualizar este usuario'
       });
+    }
+
+    // Solo procesar usuarios de Google
+    if (provider !== 'google') {
+      console.log('Usuario no es de Google, no se procesa:', { id, email, provider });
+      return res.status(200).json({ message: 'Usuario no procesado (no es de Google)' });
     }
 
     // Verificar si el usuario ya existe
@@ -22,29 +28,18 @@ router.post('/', verifyToken, async (req, res) => {
     );
 
     if (existingUsers.length > 0) {
-      // Actualizar usuario existente
-      await pool().query(
-        `UPDATE users 
-         SET email = ?, 
-             provider = ?,
-             name = ?,
-             photo_url = ?,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [email, provider, name, photo_url, id]
-      );
-
-      console.log('Usuario actualizado:', { id, email, provider });
-      res.json({ message: 'Usuario actualizado correctamente' });
+      // Si el usuario ya existe, no hacer nada
+      console.log('Usuario ya existe, no se actualiza:', { id, email, provider });
+      return res.status(200).json({ message: 'Usuario ya existe, no se actualiza' });
     } else {
-      // Crear nuevo usuario
+      // Crear nuevo usuario solo si es de Google y no existe
       await pool().query(
-        `INSERT INTO users (id, email, provider, name, photo_url, role, created_at) 
-         VALUES (?, ?, ?, ?, ?, 'user', ?)`,
-        [id, email, provider, name, photo_url, created_at]
+        `INSERT INTO users (id, email, provider, name, photo_url, role) 
+         VALUES (?, ?, ?, ?, ?, 'user')`,
+        [id, email, provider, name, photo_url]
       );
 
-      console.log('Nuevo usuario creado:', { id, email, provider });
+      console.log('Nuevo usuario de Google creado:', { id, email, provider });
       res.status(201).json({ message: 'Usuario creado correctamente' });
     }
   } catch (error) {

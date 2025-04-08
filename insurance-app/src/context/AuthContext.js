@@ -33,7 +33,12 @@ export function AuthProvider({ children }) {
         created_at: new Date().toISOString()
       };
 
-      console.log('Guardando datos de usuario:', { ...userData, token: '***' });
+      console.group('Sincronizando usuario con la base de datos');
+      console.log('Datos de usuario a guardar:', {
+        ...userData,
+        // No mostrar el token completo por seguridad
+        token: token.substring(0, 10) + '...' + token.substring(token.length - 5)
+      });
 
       const response = await fetch('http://localhost:8000/api/users', {
         method: 'POST',
@@ -44,16 +49,22 @@ export function AuthProvider({ children }) {
         body: JSON.stringify(userData)
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
+        console.error('Error en la respuesta del servidor:', data);
         throw new Error('Error al guardar usuario en la base de datos');
       }
 
-      const data = await response.json();
-      console.log('Usuario guardado correctamente:', data);
+      console.log('Respuesta del servidor:', data);
+      console.log('Estado de la operación:', response.status, response.statusText);
+      console.log('Usuario sincronizado correctamente con la base de datos');
+      console.groupEnd();
       
       return data;
     } catch (error) {
-      console.error('Error al crear/actualizar usuario en la base de datos:', error);
+      console.error('Error al sincronizar usuario con la base de datos:', error);
+      console.groupEnd();
       throw error;
     }
   }
@@ -75,6 +86,20 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Mostrar información detallada del usuario en la consola
+      console.group('Inicio de sesión con Email exitoso');
+      console.log('ID de usuario:', result.user.uid);
+      console.log('Email:', result.user.email);
+      console.log('Verificado:', result.user.emailVerified);
+      console.log('Proveedor:', 'email');
+      console.log('Metadata:', {
+        creationTime: result.user.metadata.creationTime,
+        lastSignInTime: result.user.metadata.lastSignInTime
+      });
+      console.log('Token:', await result.user.getIdToken(true));
+      console.groupEnd();
+      
       await createOrUpdateUser(result.user);
       return result;
     } catch (error) {
@@ -94,7 +119,25 @@ export function AuthProvider({ children }) {
       
       console.log('Iniciando proceso de login con Google...');
       const result = await signInWithPopup(auth, provider);
-      console.log('Login con Google exitoso, guardando datos...');
+      
+      // Mostrar información detallada del usuario en la consola
+      console.group('Inicio de sesión con Google exitoso');
+      console.log('ID de usuario:', result.user.uid);
+      console.log('Email:', result.user.email);
+      console.log('Nombre:', result.user.displayName);
+      console.log('Foto de perfil:', result.user.photoURL);
+      console.log('Verificado:', result.user.emailVerified);
+      console.log('Proveedor:', 'google');
+      console.log('Metadata:', {
+        creationTime: result.user.metadata.creationTime,
+        lastSignInTime: result.user.metadata.lastSignInTime
+      });
+      
+      // Datos adicionales específicos de Google
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      console.log('Token de acceso de Google:', credential.accessToken);
+      console.log('Token de ID:', await result.user.getIdToken(true));
+      console.groupEnd();
       
       await createOrUpdateUser(result.user, 'google');
       return result;

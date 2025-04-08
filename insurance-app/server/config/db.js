@@ -59,7 +59,10 @@ const initializeDatabase = async () => {
         email VARCHAR(255) NOT NULL UNIQUE,
         role ENUM('admin', 'user') DEFAULT 'user',
         provider VARCHAR(50) DEFAULT 'email',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        name VARCHAR(255),
+        photo_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('Tabla users creada o ya existente');

@@ -50,6 +50,7 @@ function NewIncident() {
   const { currentUser } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [cameraLoading, setCameraLoading] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -78,10 +79,18 @@ function NewIncident() {
       console.log('Imagen cargada correctamente');
       const imageUrl = reader.result;
       console.log('URL de la imagen:', imageUrl.substring(0, 50) + '...');
-      setPhotos(prevPhotos => {
-        const newPhotos = [...prevPhotos, imageUrl];
-        console.log('Total de fotos:', newPhotos.length);
-        return newPhotos;
+      
+      // Comprimir la imagen antes de guardarla
+      compressImage(imageUrl).then(compressedImage => {
+        console.log('Imagen comprimida correctamente');
+        setPhotos(prevPhotos => {
+          const newPhotos = [...prevPhotos, compressedImage];
+          console.log('Total de fotos:', newPhotos.length);
+          return newPhotos;
+        });
+      }).catch(error => {
+        console.error('Error al comprimir la imagen:', error);
+        setError('Error al procesar la imagen: ' + error.message);
       });
     };
 
@@ -98,6 +107,53 @@ function NewIncident() {
     }
   };
 
+  // Función para comprimir imágenes
+  const compressImage = (dataUrl) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const image = new Image();
+        image.onload = () => {
+          // Calcular nuevas dimensiones manteniendo la proporción
+          let width = image.width;
+          let height = image.height;
+          
+          // Limitar tamaño máximo a 1200px en cualquier dimensión
+          const maxDimension = 1200;
+          if (width > height && width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          } else if (height > width && height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+          
+          // Crear canvas para comprimir la imagen
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Dibujar la imagen en el canvas con las nuevas dimensiones
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(image, 0, 0, width, height);
+          
+          // Convertir a base64 con calidad reducida
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedDataUrl);
+        };
+        
+        image.onerror = (error) => {
+          console.error('Error al cargar la imagen para comprimir:', error);
+          reject(new Error('Error al procesar la imagen'));
+        };
+        
+        image.src = dataUrl;
+      } catch (error) {
+        console.error('Error al comprimir la imagen:', error);
+        reject(error);
+      }
+    });
+  };
+
   const handleRemovePhoto = (indexToRemove) => {
     console.log('Eliminando foto en índice:', indexToRemove);
     setPhotos(prevPhotos => {
@@ -109,72 +165,142 @@ function NewIncident() {
 
   const handleCameraOpen = async () => {
     setError('');
+    setCameraLoading(true);
+    setIsCameraOpen(true); // Abrimos el diálogo inmediatamente
+    
     try {
+      // Detener cualquier stream anterior
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
 
+      console.log('Solicitando acceso a la cámara...');
+      
+      // Usar una configuración muy básica para empezar
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false
       });
-
+      
+      console.log('Cámara accedida con éxito');
       streamRef.current = stream;
 
+      // Aplicar el stream al elemento de video 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = async () => {
-          try {
-            await videoRef.current.play();
-          } catch (playError) {
-            console.error('Error al reproducir el video:', playError);
-            setError('Error al iniciar la cámara. Por favor, recarga la página.');
-          }
+        
+        // Escuchar el evento 'loadeddata' que es más fiable que 'loadedmetadata'
+        videoRef.current.onloadeddata = () => {
+          console.log('Video data cargada');
+          setCameraLoading(false);
         };
+        
+        // Intentar iniciar la reproducción
+        try {
+          await videoRef.current.play();
+          console.log('Reproducción iniciada');
+        } catch (playError) {
+          console.error('Error al iniciar la reproducción del video:', playError);
+          // Incluso si falla el play(), puede que el video se muestre, así que continuamos
+        }
       }
-
-      setIsCameraOpen(true);
     } catch (error) {
-      console.error('Error al abrir la cámara:', error);
-      setError('No se pudo acceder a la cámara. Por favor, verifica los permisos.');
+      console.error('Error al acceder a la cámara:', error);
+      
+      if (error.name === 'NotAllowedError') {
+        setError('Permiso de cámara denegado. Por favor, permite el acceso a la cámara en tu navegador.');
+      } else if (error.name === 'NotFoundError') {
+        setError('No se encontró ninguna cámara en tu dispositivo.');
+      } else if (error.name === 'NotReadableError' || error.name === 'AbortError') {
+        setError('No se pudo acceder a la cámara. Puede que esté siendo usada por otra aplicación.');
+      } else {
+        setError(`Error al acceder a la cámara: ${error.name}`);
+      }
+      
+      setCameraLoading(false);
     }
   };
 
   const handleCameraClose = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+    console.log('Cerrando cámara...');
+    
+    // Detener todos los tracks de video
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        console.log('Deteniendo track:', track.kind);
+        track.stop();
+      });
+      streamRef.current = null;
     }
+    
+    // Limpiar el elemento de video
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      console.log('Video element limpiado');
+    }
+    
     setIsCameraOpen(false);
+    setCameraLoading(false);
   };
 
-  const handleCapture = async () => {
-    if (!videoRef.current) return;
+  const handleCapture = () => {
+    if (!videoRef.current || !streamRef.current) {
+      console.error('No hay video o stream para capturar');
+      return;
+    }
 
     try {
+      console.log('Capturando foto...');
       const video = videoRef.current;
       const canvas = document.createElement('canvas');
       
-      // Usar las dimensiones reales del video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
+      // Si el video aún no tiene dimensiones, usar valores predeterminados
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 480;
+      
+      console.log(`Dimensiones del video: ${width}x${height}`);
+      
+      // Limitar el tamaño máximo para mejor rendimiento
+      let targetWidth = width;
+      let targetHeight = height;
+      const maxDimension = 1200;
+      
+      if (targetWidth > targetHeight && targetWidth > maxDimension) {
+        targetHeight = (targetHeight * maxDimension) / targetWidth;
+        targetWidth = maxDimension;
+      } else if (targetHeight > targetWidth && targetHeight > maxDimension) {
+        targetWidth = (targetWidth * maxDimension) / targetHeight;
+        targetHeight = maxDimension;
+      }
+      
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      
       const ctx = canvas.getContext('2d');
       
-      // Dibujar el video en el canvas
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Voltear horizontalmente si no es móvil (cámara frontal en PC)
+      if (!isMobile) {
+        ctx.translate(targetWidth, 0);
+        ctx.scale(-1, 1);
+      }
+      
+      // Dibujar el video en el canvas con las dimensiones reducidas
+      ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+      
+      // Convertir a base64 con calidad reducida para menor tamaño
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      console.log('Imagen capturada y comprimida a base64');
+      
+      // Añadir la foto a la lista
+      setPhotos(prevPhotos => [...prevPhotos, dataUrl]);
+      console.log('Foto añadida a la lista');
 
-      // Convertir a blob para mejor manejo de memoria
-      canvas.toBlob((blob) => {
-        const newPhoto = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        setPhotos(prevPhotos => [...prevPhotos, newPhoto]);
-      }, 'image/jpeg', 0.9);
-
+      // Cerrar la cámara después de capturar
       handleCameraClose();
     } catch (error) {
       console.error('Error al capturar la foto:', error);
-      setError('Error al capturar la foto. Por favor, intenta de nuevo.');
+      setError('Error al capturar la foto: ' + error.message);
     }
   };
 
@@ -309,6 +435,9 @@ function NewIncident() {
                 <Typography variant="subtitle1" gutterBottom>
                   Añadir Fotos
                 </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Las imágenes se comprimirán automáticamente para optimizar el envío.
+                </Typography>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 2 }}>
                   <Box sx={{ width: '200px' }}>
                     <input
@@ -357,7 +486,7 @@ function NewIncident() {
                             }}
                           >
                             <img
-                              src={photo instanceof File ? URL.createObjectURL(photo) : photo}
+                              src={typeof photo === 'string' ? photo : URL.createObjectURL(photo)}
                               alt={`Foto ${index + 1}`}
                               style={{
                                 width: '100%',
@@ -415,76 +544,123 @@ function NewIncident() {
         onClose={handleCameraClose}
         maxWidth="sm"
         fullWidth
+        BackdropProps={{
+          style: { backgroundColor: 'rgba(0,0,0,0.9)' }
+        }}
         PaperProps={{
           sx: {
-            bgcolor: 'black',
-            position: 'relative',
+            bgcolor: '#000',
+            borderRadius: 2,
             overflow: 'hidden',
-            height: '80vh'
+            boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+            height: isMobile ? '90vh' : '70vh',
+            margin: 0,
+            maxHeight: 'none'
           }
         }}
       >
-        <DialogContent sx={{ p: 0, position: 'relative', height: '100%' }}>
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
           <Box sx={{ 
-            width: '100%', 
-            height: '100%',
-            position: 'relative',
-            bgcolor: 'black',
+            position: 'relative', 
+            flex: 1, 
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
+            overflow: 'hidden',
+            backgroundColor: '#000'
           }}>
+            {/* Overlay de carga */}
+            {cameraLoading && (
+              <Box sx={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: '100%', 
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                bgcolor: 'rgba(0,0,0,0.8)'
+              }}>
+                <Box sx={{ 
+                  p: 1.5,
+                  borderRadius: '50%',
+                  bgcolor: 'white',
+                  mb: 2,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <CameraAltIcon fontSize="large" color="primary" />
+                </Box>
+                <Typography variant="h6" color="white">
+                  Iniciando cámara...
+                </Typography>
+              </Box>
+            )}
+            
+            {/* Elemento de video */}
             <video
               ref={videoRef}
               style={{
                 width: '100%',
                 height: '100%',
                 objectFit: 'contain',
-                transform: isMobile ? 'none' : 'scaleX(-1)'
+                background: '#000',
+                display: 'block'
               }}
               playsInline
               autoPlay
+              muted
             />
-          </Box>
-          <Box sx={{
-            position: 'absolute',
-            bottom: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: 2,
-            zIndex: 1
-          }}>
+            
+            {/* Botón para capturar foto */}
+            <Box sx={{
+              position: 'absolute',
+              bottom: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1
+            }}>
+              <IconButton
+                onClick={handleCapture}
+                disabled={cameraLoading}
+                sx={{
+                  width: 64,
+                  height: 64,
+                  backgroundColor: 'white',
+                  '&:hover': { 
+                    backgroundColor: 'white',
+                    transform: 'scale(1.05)'
+                  },
+                  transition: 'all 0.2s'
+                }}
+              >
+                <RadioButtonCheckedIcon sx={{ fontSize: 40, color: 'red' }} />
+              </IconButton>
+            </Box>
+            
+            {/* Botón para cerrar */}
             <IconButton
-              onClick={handleCapture}
+              onClick={handleCameraClose}
               sx={{
-                bgcolor: 'white',
-                color: 'error.main',
-                '&:hover': { 
-                  bgcolor: 'white',
-                  transform: 'scale(1.1)'
-                },
-                width: 64,
-                height: 64,
-                transition: 'transform 0.2s'
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                zIndex: 1,
+                color: 'white',
+                bgcolor: 'rgba(0,0,0,0.5)',
+                '&:hover': {
+                  bgcolor: 'rgba(0,0,0,0.7)'
+                }
               }}
             >
-              <RadioButtonCheckedIcon sx={{ fontSize: 40 }} />
+              <CloseIcon />
             </IconButton>
           </Box>
-          <IconButton
-            onClick={handleCameraClose}
-            sx={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              color: 'white',
-              bgcolor: 'rgba(0,0,0,0.5)',
-              '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
         </DialogContent>
       </Dialog>
     </Container>

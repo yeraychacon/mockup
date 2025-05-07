@@ -22,6 +22,7 @@ Esta aplicación web permite a los usuarios gestionar incidencias relacionadas c
 ### 1. Frontend
 
 1. Instalar dependencias:
+
    ```bash
    cd insurance-app
    npm install
@@ -35,6 +36,7 @@ Esta aplicación web permite a los usuarios gestionar incidencias relacionadas c
 ### 2. Backend
 
 1. Instalar dependencias:
+
    ```bash
    cd insurance-app/server
    npm install
@@ -44,24 +46,21 @@ Esta aplicación web permite a los usuarios gestionar incidencias relacionadas c
    - Crear una base de datos MySQL
    - Actualizar las credenciales en `server/config/db.js` o usar variables de entorno
 
-3. Crear archivo `.env` en la carpeta `server`:
-   ```
-   DB_HOST=localhost
-   DB_USER=tu_usuario
-   DB_PASSWORD=tu_contraseña
-   DB_NAME=insurance_db
-   PORT=5000
-   ```
+
 
 ## Ejecución
 
 ### Frontend
+
 ```bash
 cd insurance-app
 npm start
 ```
 
 ### Backend
+
+Abrir otra terminal y ejecutar los siguientes comandos
+
 ```bash
 cd insurance-app/server
 npm run dev
